@@ -3,6 +3,8 @@ from types import ModuleType
 
 class DummyModule(ModuleType):
     def __getattr__(self, name):
+        if name.startswith('__'):
+            raise AttributeError(name)
         return DummyModule(name)
     def __call__(self, *args, **kwargs):
         return False
