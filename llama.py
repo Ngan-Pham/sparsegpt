@@ -77,6 +77,11 @@ def llama_sequential(model, dataloader, dev):
     quantizers = {}
     for i in range(len(layers)):
         layer = layers[i].to(dev)
+        if args.smoothquant:
+            print(f"Smoothing layer {i}...")
+            from smoothquant import collect_layer_scales, apply_smoothquant_to_layer
+            scales = collect_layer_scales(layer, inps, attention_mask=attention_mask)
+            apply_smoothquant_to_layer(layer, 'llama', scales, alpha=args.smooth_alpha)
         full = find_layers(layer)
 
         if args.true_sequential:
@@ -302,6 +307,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--log_wandb", action="store_true", help="Whether to log to wandb."
+    )
+    parser.add_argument(
+        "--smoothquant", action="store_true", help="Whether to run SmoothQuant before pruning/quantization."
+    )
+    parser.add_argument(
+        "--smooth_alpha", type=float, default=0.5, help="Alpha parameter for SmoothQuant."
     )
 
     args = parser.parse_args()
