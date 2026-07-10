@@ -1,5 +1,10 @@
-import argparse
 import torch
+# Hotfix for torchao import crash on older PyTorch versions
+for dtype_name in ['int1', 'int2', 'int4']:
+    if not hasattr(torch, dtype_name):
+        setattr(torch, dtype_name, torch.int8)
+
+import argparse
 import torch.nn as nn
 from transformers import AutoTokenizer, LlamaTokenizer, LlamaForCausalLM, OPTForCausalLM, BloomForCausalLM, AutoModelForCausalLM
 from datasets import load_dataset

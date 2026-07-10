@@ -1,7 +1,11 @@
+import torch
+# Hotfix for torchao import crash on older PyTorch versions
+for dtype_name in ['int1', 'int2', 'int4']:
+    if not hasattr(torch, dtype_name):
+        setattr(torch, dtype_name, torch.int8)
+
 import math
 import time
-
-import torch
 import torch.nn as nn
 import transformers
 
