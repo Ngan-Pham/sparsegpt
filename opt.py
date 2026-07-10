@@ -45,7 +45,7 @@ def opt_sequential(model, dataloader, dev):
     inps = torch.zeros(
         (args.nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
     )
-    cache = {'i': 0, 'attention_mask': None}
+    cache = {'i': 0}
 
     class Catcher(nn.Module):
         def __init__(self, module):
@@ -53,8 +53,11 @@ def opt_sequential(model, dataloader, dev):
             self.module = module
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp
+            for k, v in kwargs.items():
+                if k not in cache:
+                    cache[k] = []
+                cache[k].append(v)
             cache['i'] += 1
-            cache['attention_mask'] = kwargs['attention_mask']
             raise ValueError
     layers[0] = Catcher(layers[0])
     for batch in dataloader:
@@ -74,7 +77,15 @@ def opt_sequential(model, dataloader, dev):
     torch.cuda.empty_cache()
 
     outs = torch.zeros_like(inps)
-    attention_mask = cache['attention_mask']
+    
+    # Construct kwargs list for each sample j
+    layer_kwargs_list = []
+    for j in range(args.nsamples):
+        layer_kwargs = {}
+        for k, v in cache.items():
+            if k != "i" and isinstance(v, list) and len(v) > j:
+                layer_kwargs[k] = v[j]
+        layer_kwargs_list.append(layer_kwargs)
 
     print('Ready.')
 
@@ -83,7 +94,7 @@ def opt_sequential(model, dataloader, dev):
         if args.smoothquant:
             print(f"Smoothing layer {i}...")
             from smoothquant import collect_layer_scales, apply_smoothquant_to_layer
-            scales = collect_layer_scales(layer, inps, attention_mask=attention_mask)
+            scales = collect_layer_scales(layer, inps, layer_kwargs_list=layer_kwargs_list)
             apply_smoothquant_to_layer(layer, 'opt', scales, alpha=args.smooth_alpha)
 
         subset = find_layers(layer)
@@ -107,7 +118,7 @@ def opt_sequential(model, dataloader, dev):
         for name in gpts:
             handles.append(subset[name].register_forward_hook(add_batch(name)))
         for j in range(args.nsamples):
-            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
+            outs[j] = layer(inps[j].unsqueeze(0), **layer_kwargs_list[j])[0]
         for h in handles:
             h.remove()
 
@@ -121,7 +132,7 @@ def opt_sequential(model, dataloader, dev):
             gpts[name].free()
 
         for j in range(args.nsamples):
-            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask)[0]
+            outs[j] = layer(inps[j].unsqueeze(0), **layer_kwargs_list[j])[0]
 
         layers[i] = layer.cpu()
         del layer

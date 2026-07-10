@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-def collect_layer_scales(layer, inps, attention_mask=None, alibi=None):
+def collect_layer_scales(layer, inps, layer_kwargs_list=None):
     """
     Registers forward hooks on all linear layers in the decoder block,
     passes inputs through the block to collect activation scales, and removes hooks.
@@ -34,11 +34,7 @@ def collect_layer_scales(layer, inps, attention_mask=None, alibi=None):
     # We must be in eval and no_grad mode
     layer.eval()
     for j in range(num_samples):
-        kwargs = {}
-        if attention_mask is not None:
-            kwargs['attention_mask'] = attention_mask
-        if alibi is not None:
-            kwargs['alibi'] = alibi
+        kwargs = layer_kwargs_list[j] if (layer_kwargs_list and j < len(layer_kwargs_list)) else {}
             
         with torch.no_grad():
             layer(inps[j].unsqueeze(0), **kwargs)
