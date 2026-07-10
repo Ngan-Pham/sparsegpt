@@ -1,26 +1,3 @@
-import sys
-from types import ModuleType
-
-class DummyModule(ModuleType):
-    def __getattr__(self, name):
-        if name.startswith('__'):
-            raise AttributeError(name)
-        return DummyModule(name)
-    def __call__(self, *args, **kwargs):
-        return False
-
-# Stub out torchao entirely to prevent import crash on incompatible torch versions
-for mod_name in [
-    'torchao',
-    'torchao.prototype',
-    'torchao.prototype.safetensors',
-    'torchao.prototype.safetensors.safetensors_support',
-    'torchao.quantization',
-    'torchao.quantization.linear_quant_modules',
-    'torchao.quantization.quant_primitives',
-]:
-    sys.modules[mod_name] = DummyModule(mod_name)
-
 import torch
 import math
 import time
