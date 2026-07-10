@@ -145,7 +145,7 @@ def bloom_eval(model, testenc, dev, dataset: str, log_wandb: bool = False):
     inps = torch.zeros(
         (nsamples, model.seqlen, model.config.hidden_size), dtype=dtype, device=dev
     )
-    cache = {'i': 0, 'attention_mask': None, 'alibi': None}
+    cache = {'i': 0}
 
     class Catcher(nn.Module):
         def __init__(self, module):
@@ -153,9 +153,11 @@ def bloom_eval(model, testenc, dev, dataset: str, log_wandb: bool = False):
             self.module = module
         def forward(self, inp, **kwargs):
             inps[cache['i']] = inp
+            for k, v in kwargs.items():
+                if k not in cache:
+                    cache[k] = []
+                cache[k].append(v)
             cache['i'] += 1
-            cache['attention_mask'] = kwargs['attention_mask']
-            cache['alibi'] = kwargs['alibi']
             raise ValueError
     layers[0] = Catcher(layers[0])
     for i in range(nsamples):
@@ -172,8 +174,15 @@ def bloom_eval(model, testenc, dev, dataset: str, log_wandb: bool = False):
     torch.cuda.empty_cache()
 
     outs = torch.zeros_like(inps)
-    attention_mask = cache['attention_mask']
-    alibi = cache['alibi']
+    
+    # Construct kwargs list for each sample j
+    layer_kwargs_list = []
+    for j in range(nsamples):
+        layer_kwargs = {}
+        for k, v in cache.items():
+            if k != "i" and isinstance(v, list) and len(v) > j:
+                layer_kwargs[k] = v[j]
+        layer_kwargs_list.append(layer_kwargs)
 
     for i in range(len(layers)):
         print(i)
@@ -187,7 +196,7 @@ def bloom_eval(model, testenc, dev, dataset: str, log_wandb: bool = False):
                 W.data[torch.abs(W.data) <= thresh] = 0
 
         for j in range(nsamples):
-            outs[j] = layer(inps[j].unsqueeze(0), attention_mask=attention_mask, alibi=alibi)[0]
+            outs[j] = layer(inps[j].unsqueeze(0), **layer_kwargs_list[j])[0]
         layers[i] = layer.cpu() 
         del layer
         torch.cuda.empty_cache()
