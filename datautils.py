@@ -44,11 +44,19 @@ def get_wikitext2(nsamples, seed, seqlen, model, tokenizer):
     return trainloader, testenc
 
 def get_ptb(nsamples, seed, seqlen, model, tokenizer):
-    traindata = load_dataset('ptb_text_only', 'penn_treebank', split='train', trust_remote_code=True)
-    testdata = load_dataset('ptb_text_only', 'penn_treebank', split='test', trust_remote_code=True)
+    traindata = load_dataset(
+        'text', 
+        data_files={"train": "https://raw.githubusercontent.com/wojciechz/ptb/master/data/ptb.train.txt"}, 
+        split='train'
+    )
+    testdata = load_dataset(
+        'text', 
+        data_files={"test": "https://raw.githubusercontent.com/wojciechz/ptb/master/data/ptb.test.txt"}, 
+        split='test'
+    )
 
-    trainenc = tokenizer(" ".join(traindata['sentence']), return_tensors='pt')
-    testenc = tokenizer(" ".join(testdata['sentence']), return_tensors='pt')
+    trainenc = tokenizer(" ".join(traindata['text']), return_tensors='pt')
+    testenc = tokenizer(" ".join(testdata['text']), return_tensors='pt')
 
     random.seed(seed)
     trainloader = []
